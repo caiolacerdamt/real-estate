@@ -774,8 +774,8 @@
           const response = await fetch(`${API_URL}?action=import`, { method: 'POST', body: formData });
           const data = await response.json();
           if (!data.success) throw new Error(data.error || 'Erro no import');
-          messageEl.textContent = `Importado: ${data.imported} leads (${data.new} novos, ${data.updated} atualizados)`;
-          setTimeout(() => window.location.reload(), 2000);
+          messageEl.textContent = `Importado: ${data.imported} leads (${data.new} novos, ${data.updated} atualizados). Recarregando em 5s...`;
+          setTimeout(() => window.location.reload(), 5000);
         } catch (error) {
           messageEl.textContent = error.message;
         }
