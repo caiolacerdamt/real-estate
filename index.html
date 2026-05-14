@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Real Estate CRM</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .line-clamp-3 {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .swot-item {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .swot-item-clamp {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-900 text-gray-100 antialiased">
+  <div id="app" class="min-h-screen"></div>
+
+  <script>
+    const API_URL = 'api.php';
+    const STATUSES = ['Novo', 'Contatado', 'Respondeu', 'Em negociação'];
+    const DEFAULT_COLUMN_LABELS = {
+      'Novo': 'Novo',
+      'Contatado': 'Contatado',
+      'Respondeu': 'Respondeu',
+      'Em negociação': 'Em negociação'
+    };
+    const TIER_OPTIONS = ['All', 'A+', 'A', 'B', 'C', 'D'];
+    const PAGE_SIZE = 15;
+    const app = document.getElementById('app');
+
+    let leads = [];
+    let filters = { search: '', tier: 'All', approach: 'All' };
+    let columnLimits = {};
+    let columnLabels = { ...DEFAULT_COLUMN_LABELS };
+    let selectedLeadId = null;
+
+    const escapeHtml = (value) => String(value || '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+
+    const normalize = (value) => String(value || '').toLowerCase().trim();
+    const getLead = (id) => leads.find((lead) => lead.Lead_ID === id);
+    const uniqueApproaches = () => [...new Set(leads.map((lead) => lead.Approach_Type).filter(Boolean))].sort();
+
+    function tierClasses(tier) {
+      if (tier === 'A+') return { border: 'border-l-emerald-500', badge: 'bg-emerald-600 text-white ring-emerald-800/40' };
+      if (tier === 'A') return { border: 'border-l-green-500', badge: 'bg-green-600 text-white ring-green-800/40' };
+      if (tier === 'B') return { border: 'border-l-yellow-500', badge: 'bg-yellow-400 text-yellow-950 ring-yellow-700/40' };
+      if (tier === 'D') return { border: 'border-l-red-400', badge: 'bg-red-600 text-white ring-red-800/40' };
+      return { border: 'border-l-gray-400', badge: 'bg-gray-700 text-white ring-gray-900/30' };
+    }
+
+    function statusAccent(status) {
+      const colors = {
+        'Novo': { dot: 'bg-blue-500', text: 'text-blue-300', card: 'bg-blue-200 border-blue-400 border-l-blue-500 hover:bg-blue-300' },
+        'Contatado': { dot: 'bg-purple-500', text: 'text-purple-300', card: 'bg-purple-200 border-purple-400 border-l-purple-500 hover:bg-purple-300' },
+        'Respondeu': { dot: 'bg-yellow-500', text: 'text-yellow-200', card: 'bg-yellow-200 border-yellow-400 border-l-yellow-500 hover:bg-yellow-300' },
+        'Em negociação': { dot: 'bg-orange-500', text: 'text-orange-300', card: 'bg-orange-200 border-orange-400 border-l-orange-500 hover:bg-orange-300' }
+      };
+      return colors[status] || { dot: 'bg-gray-500', text: 'text-gray-300', card: 'bg-gray-200 border-gray-400 border-l-gray-500 hover:bg-gray-300' };
+    }
+
+    async function saveColumnLabels() {
+      const response = await fetch(`${API_URL}?action=update_column_labels`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column_labels: columnLabels })
+      });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Erro ao salvar nomes das colunas');
+      columnLabels = { ...DEFAULT_COLUMN_LABELS, ...(data.column_labels || {}) };
+      return columnLabels;
+    }
+
+    function statusLabel(status) {
+      return columnLabels[status] || status;
+    }
+
+    function activityDot(activity) {
+      const value = normalize(activity);
+      if (value === 'high') return 'bg-green-500';
+      if (value === 'medium') return 'bg-yellow-500';
+      if (value === 'low') return 'bg-red-500';
+      return 'bg-gray-400';
+    }
+
+    function resetColumnLimits() {
+      columnLimits = {};
+      STATUSES.forEach((status) => {
+        columnLimits[status] = PAGE_SIZE;
+      });
+    }
+
+    function getColumnLimit(status) {
+      if (!columnLimits[status]) columnLimits[status] = PAGE_SIZE;
+      return columnLimits[status];
+    }
+
+    function filteredLeads() {
+      return leads.filter((lead) => {
+        const matchesName = normalize(lead.Name).includes(normalize(filters.search));
+        const matchesTier = filters.tier === 'All' || lead.New_Tier === filters.tier;
+        const matchesApproach = filters.approach === 'All' || lead.Approach_Type === filters.approach;
+        return matchesName && matchesTier && matchesApproach;
+      });
+    }
+
+    async function loadLeads() {
+      app.innerHTML = `<div class="flex min-h-screen items-center justify-center text-slate-500">Carregando leads...</div>`;
+
+      try {
+        const response = await fetch(`${API_URL}?action=get_leads`);
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Erro ao carregar leads');
+
+        leads = Array.isArray(data.leads) ? data.leads : [];
+        columnLabels = { ...DEFAULT_COLUMN_LABELS, ...(data.column_labels || {}) };
+        resetColumnLimits();
+        if (leads.length === 0) {
+          renderImportScreen();
+        } else {
+          renderCRM();
+        }
+      } catch (error) {
+        app.innerHTML = `<div class="mx-auto flex min-h-screen max-w-xl items-center justify-center p-6">
+          <div class="rounded-lg border border-red-200 bg-red-50 p-5 text-red-700">${escapeHtml(error.message)}</div>
+        </div>`;
+      }
+    }
+
+    function renderImportScreen(message = '') {
+      app.innerHTML = `
+        <main class="flex min-h-screen items-center justify-center px-4 py-10">
+          <section class="w-full max-w-xl rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
+            <div class="mb-6 text-center">
+              <div class="mb-4 text-4xl">📋</div>
+              <h1 class="text-2xl font-semibold tracking-tight text-slate-950">Nenhum lead importado ainda</h1>
+            </div>
+            <form id="import-form" class="space-y-5">
+              <input id="csv-file" name="csv" type="file" accept=".csv,text/csv" class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-800">
+              <button type="submit" class="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Importar</button>
+            </form>
+            <p class="mt-5 text-center text-sm leading-6 text-slate-500">Formato esperado: CSV com headers na primeira linha, separador vírgula.</p>
+            <p id="import-message" class="mt-4 text-center text-sm text-slate-500">${escapeHtml(message)}</p>
+          </section>
+        </main>
+      `;
+      bindImportForm(document.getElementById('import-form'), document.getElementById('import-message'));
+    }
+
+    function renderCRM(options = {}) {
+      const approaches = uniqueApproaches();
+      const visibleLeads = filteredLeads();
+      const shouldRestoreSearchFocus = options.restoreSearchFocus || document.activeElement?.id === 'search-filter';
+      const searchCursor = document.getElementById('search-filter')?.selectionStart ?? filters.search.length;
+
+      app.innerHTML = `
+        <div class="min-h-screen">
+          <header class="border-b border-gray-800 bg-gray-950/80 px-4 py-4">
+            <div class="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <h1 class="text-xl font-semibold tracking-tight text-white">Real Estate CRM</h1>
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button id="open-import" class="rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-100 hover:bg-gray-800">Importar CSV</button>
+                <div class="rounded-md bg-gray-800 px-4 py-2 text-sm text-gray-300">Contador: <span class="font-semibold text-white">${visibleLeads.length}</span></div>
+              </div>
+            </div>
+          </header>
+
+          <section class="border-b border-gray-800 bg-gray-900 px-4 py-4">
+            <div class="mx-auto grid max-w-7xl gap-3 md:grid-cols-[1fr_160px_240px_auto]">
+              <input id="search-filter" type="search" placeholder="🔍 Buscar por nome..." value="${escapeHtml(filters.search)}" class="rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-green-500">
+              <select id="tier-filter" class="rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-green-500">
+                ${TIER_OPTIONS.map((tier) => `<option value="${tier}" ${filters.tier === tier ? 'selected' : ''}>${tier === 'All' ? 'Tier: All' : tier}</option>`).join('')}
+              </select>
+              <select id="approach-filter" class="rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-green-500">
+                <option value="All">Approach: All</option>
+                ${approaches.map((approach) => `<option value="${escapeHtml(approach)}" ${filters.approach === approach ? 'selected' : ''}>${escapeHtml(approach)}</option>`).join('')}
+              </select>
+              <button id="clear-filters" class="rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-gray-100 hover:bg-gray-700">Limpar</button>
+            </div>
+          </section>
+
+          <main class="overflow-x-auto px-4 py-5">
+            <div class="mx-auto flex w-max max-w-[1800px] justify-center gap-4 pb-4 xl:w-full">
+              ${STATUSES.map((status) => renderColumn(status, visibleLeads.filter((lead) => (lead.Status || 'Novo') === status))).join('')}
+            </div>
+          </main>
+        </div>
+        <div id="modal-root"></div>
+        <div id="import-root"></div>
+      `;
+
+      bindFilters();
+      document.getElementById('open-import').addEventListener('click', renderImportModal);
+
+      if (shouldRestoreSearchFocus) {
+        const searchInput = document.getElementById('search-filter');
+        searchInput.focus();
+        searchInput.setSelectionRange(searchCursor, searchCursor);
+      }
+    }
+
+    function renderColumn(status, columnLeads) {
+      const limit = getColumnLimit(status);
+      const visibleColumnLeads = columnLeads.slice(0, limit);
+      const hasMore = columnLeads.length > visibleColumnLeads.length;
+      const accent = statusAccent(status);
+      const label = columnLabels[status] || status;
+
+      return `
+        <section class="flex h-[calc(100vh-180px)] min-w-[360px] flex-1 flex-col rounded-lg border border-gray-800 bg-gray-950 xl:min-w-0">
+          <div class="flex items-center justify-between border-b border-gray-800 px-4 py-3">
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full ${accent.dot}"></span>
+              <input data-column-label="${escapeHtml(status)}" value="${escapeHtml(label)}" class="column-label min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-1 py-0.5 font-semibold ${accent.text} outline-none hover:border-gray-700 focus:border-gray-600 focus:bg-gray-900">
+            </div>
+            <span class="rounded-full bg-gray-800 px-2.5 py-1 text-xs text-gray-300">${columnLeads.length}</span>
+          </div>
+          <div class="space-y-3 overflow-y-auto no-scrollbar p-3">
+            ${visibleColumnLeads.map((lead) => renderLeadCard(lead, status)).join('') || '<p class="px-2 py-4 text-sm text-gray-500">Sem leads</p>'}
+            ${hasMore ? `<button type="button" data-load-more="${escapeHtml(status)}" class="load-more w-full rounded-md border border-gray-700 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-800">Carregar mais</button>` : ''}
+          </div>
+        </section>
+      `;
+    }
+
+    function splitShortNote(note) {
+      const parts = String(note || '').split('||');
+      const positives = splitNoteItems(parts[0]);
+      const negatives = splitNoteItems(parts.slice(1).join('||'));
+      return { positives, negatives };
+    }
+
+    function splitNoteItems(value) {
+      return String(value || '')
+        .split('|')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    function normalizeSocialUrl(type, value) {
+      const rawValue = String(value || '').trim();
+      if (!rawValue) return '';
+
+      if (/^https?:\/\//i.test(rawValue)) return rawValue;
+
+      if (type === 'instagram') {
+        const handle = rawValue
+          .replace(/^@/, '')
+          .replace(/^instagram\.com\//i, '')
+          .replace(/^www\.instagram\.com\//i, '')
+          .replace(/^\/+/, '')
+          .split(/[/?#]/)[0];
+        return handle ? `https://www.instagram.com/${handle}` : '';
+      }
+
+      if (type === 'linkedin') {
+        if (/^(www\.)?linkedin\.com\//i.test(rawValue)) return `https://${rawValue}`;
+        const handle = rawValue.replace(/^@/, '').replace(/^\/+/, '');
+        return handle ? `https://www.linkedin.com/in/${handle}` : '';
+      }
+
+      return rawValue;
+    }
+
+    function renderCardLink(label, url, type) {
+      const href = normalizeSocialUrl(type, url);
+      if (!href) {
+        return `<span class="text-xs font-semibold text-gray-500">${label}: -</span>`;
+      }
+
+      return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" class="card-link text-xs font-semibold text-gray-900 underline decoration-gray-500 underline-offset-4 hover:text-black">${label}</a>`;
+    }
+
+    function renderSwotList(items, emptyText) {
+      const visibleItems = items.slice(0, 3);
+      if (!visibleItems.length) {
+        return `<p class="text-xs leading-4 text-gray-500">${emptyText}</p>`;
+      }
+
+      return visibleItems.map((item) => `<p class="swot-item swot-item-clamp text-xs leading-4 text-gray-700" title="${escapeHtml(item)}">${escapeHtml(item)}</p>`).join('');
+    }
+
+    function renderLeadCard(lead, status) {
+      const tier = lead.New_Tier || lead.Tier_Fase1 || 'C';
+      const classes = tierClasses(tier);
+      const dot = activityDot(lead.IG_Activity);
+      const accent = statusAccent(status);
+      const swot = splitShortNote(lead.Short_Note);
+      const score = lead.Score_Fase1 || lead.Brand_Score || '-';
+
+      return `
+        <article data-lead-id="${escapeHtml(lead.Lead_ID)}" tabindex="0" class="lead-card w-full cursor-pointer rounded-md border ${accent.card} border-l-4 p-4 text-left text-gray-900 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-white/70">
+          <div class="mb-2 flex items-start gap-2">
+            <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${classes.badge}">${escapeHtml(tier)}</span>
+            <div class="min-w-0">
+              <h3 class="truncate font-semibold">${escapeHtml(lead.Name)}</h3>
+              <p class="truncate text-xs text-gray-500">${escapeHtml(lead.Type)} · ${escapeHtml(lead.Gender)}</p>
+            </div>
+          </div>
+          <div class="mt-2 grid grid-cols-2 gap-3 text-sm text-gray-700">
+            <p>Score: <span class="font-semibold text-gray-950">${escapeHtml(score)}</span></p>
+            <p>Brand: <span class="font-semibold text-gray-950">${escapeHtml(lead.Brand_Score || '-')}</span></p>
+          </div>
+          <p class="mt-1 truncate text-sm text-gray-700">Angle: <span class="font-medium text-gray-900">${escapeHtml(lead.Recommended_Angle || '-')}</span></p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            ${renderCardLink('Instagram', lead.Instagram, 'instagram')}
+            ${renderCardLink('LinkedIn', lead.Linkedin, 'linkedin')}
+          </div>
+          <div class="mt-2 grid gap-0.5 text-sm text-gray-700">
+            <p class="truncate">IG: <span class="font-medium">${escapeHtml(lead.IG_Followers || '-')}</span> seguidores · <span class="font-medium">${escapeHtml(lead.IG_Posts_30d || '-')}</span> posts/30d</p>
+            <p class="truncate">LI: <span class="font-medium">${escapeHtml(lead.LI_Followers || lead.LI_Connections || '-')}</span> · <span class="font-medium">${escapeHtml(lead.LI_Company || '-')}</span></p>
+          </div>
+          <p class="mt-1 flex items-center gap-2 text-sm text-gray-700"><span class="h-2.5 w-2.5 rounded-full ${dot}"></span>IG Activity: <span class="font-medium">${escapeHtml(lead.IG_Activity || '-')}</span></p>
+          <div class="mt-3 min-w-0 overflow-hidden border-t border-gray-300/70 pt-3">
+            <p class="mb-1 text-xs font-bold uppercase tracking-wide text-gray-700">Observação</p>
+            <p class="swot-item swot-item-clamp text-xs leading-4 text-gray-700" title="${escapeHtml(lead.Observação || '')}">${escapeHtml(lead.Observação || 'Sem observação.')}</p>
+          </div>
+          <div class="mt-3 grid min-w-0 gap-2 overflow-hidden border-t border-gray-300/70 pt-3">
+            <div class="min-w-0 overflow-hidden">
+              <p class="mb-1 text-xs font-bold uppercase tracking-wide text-green-700">Positivos</p>
+              ${renderSwotList(swot.positives, 'Sem pontos positivos no Short_Note.')}
+            </div>
+            <div class="min-w-0 overflow-hidden">
+              <p class="mb-1 text-xs font-bold uppercase tracking-wide text-red-700">Negativos</p>
+              ${renderSwotList(swot.negatives, 'Sem pontos negativos no Short_Note.')}
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function bindFilters() {
+      document.querySelectorAll('.lead-card').forEach((card) => {
+        card.addEventListener('click', () => openLeadModal(card.dataset.leadId));
+        card.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openLeadModal(card.dataset.leadId);
+          }
+        });
+      });
+
+      document.querySelectorAll('.card-link').forEach((link) => {
+        link.addEventListener('click', (event) => event.stopPropagation());
+      });
+
+      document.querySelectorAll('.column-label').forEach((input) => {
+        input.addEventListener('click', (event) => event.stopPropagation());
+        input.addEventListener('input', (event) => {
+          const status = event.target.dataset.columnLabel;
+          columnLabels[status] = event.target.value || DEFAULT_COLUMN_LABELS[status] || status;
+        });
+        input.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.target.blur();
+          }
+        });
+        input.addEventListener('blur', async (event) => {
+          const status = event.target.dataset.columnLabel;
+          if (!event.target.value.trim()) {
+            columnLabels[status] = DEFAULT_COLUMN_LABELS[status] || status;
+            event.target.value = columnLabels[status];
+          }
+          try {
+            await saveColumnLabels();
+          } catch (error) {
+            event.target.title = error.message;
+          }
+        });
+      });
+
+      document.querySelectorAll('.load-more').forEach((button) => {
+        button.addEventListener('click', () => {
+          const status = button.dataset.loadMore;
+          columnLimits[status] = getColumnLimit(status) + PAGE_SIZE;
+          renderCRM();
+        });
+      });
+
+      document.getElementById('search-filter').addEventListener('input', (event) => {
+        filters.search = event.target.value;
+        resetColumnLimits();
+        renderCRM({ restoreSearchFocus: true });
+      });
+
+      document.getElementById('tier-filter').addEventListener('change', (event) => {
+        filters.tier = event.target.value;
+        resetColumnLimits();
+        renderCRM();
+      });
+
+      document.getElementById('approach-filter').addEventListener('change', (event) => {
+        filters.approach = event.target.value;
+        resetColumnLimits();
+        renderCRM();
+      });
+
+      document.getElementById('clear-filters').addEventListener('click', () => {
+        filters = { search: '', tier: 'All', approach: 'All' };
+        resetColumnLimits();
+        renderCRM();
+      });
+    }
+
+    function openLeadModal(leadId) {
+      selectedLeadId = leadId;
+      const lead = getLead(leadId);
+      if (!lead) return;
+
+      const root = document.getElementById('modal-root');
+      root.innerHTML = `
+        <div class="fixed inset-0 z-40 overflow-y-auto bg-black/60 p-4 backdrop-blur-sm">
+          <div class="mx-auto my-6 max-w-4xl rounded-lg border border-gray-700 bg-gray-900 shadow-2xl">
+            <div class="flex items-start justify-between gap-4 border-b border-gray-800 p-6">
+              <div>
+                <h2 class="text-2xl font-semibold text-white">${escapeHtml(lead.Name)}</h2>
+                <p class="mt-1 text-sm text-gray-400">${escapeHtml(lead.Type)} · ${escapeHtml(lead.Gender)} · New Tier: ${escapeHtml(lead.New_Tier)}</p>
+              </div>
+              <button id="close-modal" class="rounded-md border border-gray-700 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-800">X fechar</button>
+            </div>
+
+            <div class="border-b border-gray-800 p-6">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label class="flex-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Status
+                  <select id="status-input" class="mt-2 w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm normal-case tracking-normal text-white">
+                    ${STATUSES.map((status) => `<option value="${status}" ${(lead.Status || 'Novo') === status ? 'selected' : ''}>${escapeHtml(statusLabel(status))}</option>`).join('')}
+                  </select>
+                </label>
+                <button data-save-field="Status" class="rounded-md bg-green-500 px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-green-400">Salvar</button>
+              </div>
+            </div>
+
+            <div class="grid gap-0 border-b border-gray-800 md:grid-cols-2">
+              <section class="border-b border-gray-800 p-6 md:border-b-0 md:border-r md:border-gray-800">
+                <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Contato</h3>
+                ${contactLine('📞', lead.Phone)}
+                ${contactLine('📧', lead.Email)}
+                ${linkLine('🌐', lead.Website, lead.Website)}
+              </section>
+              <section class="p-6">
+                <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Redes sociais</h3>
+                ${linkLine('Instagram', normalizeSocialUrl('instagram', lead.Instagram), `${lead.Instagram || ''} (${lead.IG_Followers || ''})`)}
+                <p class="mt-2 text-sm text-gray-300">Posts/30d: ${escapeHtml(lead.IG_Posts_30d)} | Activity: ${escapeHtml(lead.IG_Activity)}</p>
+                <div class="my-4 border-t border-gray-800"></div>
+                ${linkLine('LinkedIn', normalizeSocialUrl('linkedin', lead.Linkedin), `${lead.LI_Followers || ''} followers`)}
+                <p class="mt-2 text-sm text-gray-300">${escapeHtml(lead.LI_Company)} | ${escapeHtml(lead.LI_Headline)}</p>
+              </section>
+            </div>
+
+            <section class="border-b border-gray-800 p-6">
+              <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Qualificação</h3>
+              <div class="space-y-2 text-sm text-gray-300">
+                <p>Score Fase1: ${escapeHtml(lead.Score_Fase1)} | Tier Fase1: ${escapeHtml(lead.Tier_Fase1)} | Brand Score: ${escapeHtml(lead.Brand_Score)}</p>
+                <p>Angle: ${escapeHtml(lead.Recommended_Angle)}</p>
+                <p>Approach: ${escapeHtml(lead.Approach_Type)}</p>
+                <p>Website: ${escapeHtml(lead.Website)} ✓ (match: ${escapeHtml(lead.Website_Match)})</p>
+                <p>Website Summary: ${escapeHtml(lead.Website_Summary)}</p>
+              </div>
+            </section>
+
+            <section class="border-b border-gray-800 p-6">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400">Primeira mensagem</h3>
+                <button id="copy-message" class="rounded-md border border-gray-700 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-800">Copiar</button>
+              </div>
+              <div class="border-l-2 border-gray-700 pl-4 text-sm leading-6 text-gray-200">${escapeHtml(lead.First_Message)}</div>
+            </section>
+
+            <section class="border-b border-gray-800 p-6">
+              <div class="mb-3 flex items-center justify-between gap-3">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400">Observação (campo editável do CSV)</h3>
+                <button data-save-field="Observação" class="rounded-md bg-green-500 px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-green-400">Salvar</button>
+              </div>
+              <textarea id="observacao-input" rows="4" class="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white">${escapeHtml(lead.Observação)}</textarea>
+            </section>
+
+            <section class="p-6">
+              <div class="mb-3 flex items-center justify-between gap-3">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400">Notas internas (campo novo, não vem do CSV)</h3>
+                <button data-save-field="Internal_Notes" class="rounded-md bg-green-500 px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-green-400">Salvar</button>
+              </div>
+              <textarea id="notes-input" rows="4" class="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white">${escapeHtml(lead.Internal_Notes)}</textarea>
+              <p id="modal-message" class="mt-3 text-sm text-gray-400"></p>
+            </section>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('close-modal').addEventListener('click', closeModal);
+      document.querySelectorAll('[data-save-field]').forEach((button) => button.addEventListener('click', () => saveField(button.dataset.saveField)));
+      document.getElementById('copy-message').addEventListener('click', copyFirstMessage);
+    }
+
+    function contactLine(icon, text) {
+      return `<p class="mt-2 break-words text-sm text-gray-300">${icon} ${escapeHtml(text)}</p>`;
+    }
+
+    function linkLine(label, url, text) {
+      if (!url) return `<p class="mt-2 text-sm text-gray-500">${escapeHtml(label)}: -</p>`;
+      return `<p class="mt-2 break-words text-sm text-gray-300">${escapeHtml(label)}: <a class="font-medium text-green-300 underline decoration-green-700 underline-offset-4 hover:text-green-200" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text || url)}</a></p>`;
+    }
+
+    function closeModal() {
+      selectedLeadId = null;
+      document.getElementById('modal-root').innerHTML = '';
+    }
+
+    async function saveField(field) {
+      const lead = getLead(selectedLeadId);
+      if (!lead) return;
+
+      const payload = { Lead_ID: lead.Lead_ID };
+      if (field === 'Status') payload.Status = document.getElementById('status-input').value;
+      if (field === 'Observação') payload.Observação = document.getElementById('observacao-input').value;
+      if (field === 'Internal_Notes') payload.Internal_Notes = document.getElementById('notes-input').value;
+
+      const message = document.getElementById('modal-message');
+      message.textContent = 'Salvando...';
+
+      try {
+        const response = await fetch(`${API_URL}?action=update_lead`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Erro ao salvar');
+
+        Object.assign(lead, payload);
+        message.textContent = 'Salvo.';
+        renderCRM();
+        openLeadModal(lead.Lead_ID);
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    }
+
+    async function copyFirstMessage() {
+      const lead = getLead(selectedLeadId);
+      if (!lead) return;
+
+      await navigator.clipboard.writeText(lead.First_Message || '');
+      const message = document.getElementById('modal-message');
+      message.textContent = 'Copiado.';
+    }
+
+    function renderImportModal() {
+      const root = document.getElementById('import-root');
+      root.innerHTML = `
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-sm">
+          <section class="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-xl">
+            <div class="mb-5 flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-950">Importar CSV</h2>
+              <button id="close-import" class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">X fechar</button>
+            </div>
+            <form id="import-form" class="space-y-5">
+              <input id="csv-file" name="csv" type="file" accept=".csv,text/csv" class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-800">
+              <button type="submit" class="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Importar</button>
+            </form>
+            <p class="mt-5 text-sm leading-6 text-slate-500">Formato esperado: CSV com headers na primeira linha, separador vírgula.</p>
+            <p id="import-message" class="mt-4 text-sm text-slate-500"></p>
+          </section>
+        </div>
+      `;
+      document.getElementById('close-import').addEventListener('click', () => root.innerHTML = '');
+      bindImportForm(document.getElementById('import-form'), document.getElementById('import-message'));
+    }
+
+    function bindImportForm(form, messageEl) {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const fileInput = form.querySelector('input[type="file"]');
+        if (!fileInput.files.length) {
+          messageEl.textContent = 'Selecione um CSV.';
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('csv', fileInput.files[0]);
+        messageEl.textContent = 'Importando...';
+
+        try {
+          const response = await fetch(`${API_URL}?action=import`, { method: 'POST', body: formData });
+          const data = await response.json();
+          if (!data.success) throw new Error(data.error || 'Erro no import');
+          window.location.reload();
+        } catch (error) {
+          messageEl.textContent = error.message;
+        }
+      });
+    }
+
+    loadLeads();
+  </script>
+</body>
+</html>
