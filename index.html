@@ -4,8 +4,57 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Real Estate CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07080a;
+      --panel: rgba(18, 20, 24, 0.86);
+      --line: rgba(255, 255, 255, 0.08);
+    }
+    html { background: var(--bg); }
+    body {
+      font-family: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(20, 184, 166, 0.11), transparent 32rem),
+        radial-gradient(circle at 80% 0%, rgba(245, 158, 11, 0.08), transparent 28rem),
+        linear-gradient(180deg, #090a0d 0%, #07080a 46%, #050506 100%);
+    }
+    ::selection { background: rgba(45, 212, 191, 0.28); color: #f8fafc; }
+    .app-shell {
+      min-height: 100vh;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.026) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+      background-size: 44px 44px;
+    }
+    .soft-panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(18px);
+    }
+    .field-dark {
+      border: 1px solid rgba(255,255,255,0.09);
+      background: rgba(8, 10, 13, 0.78);
+      color: #f4f4f5;
+      transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
+    }
+    .field-dark:focus {
+      border-color: rgba(45, 212, 191, 0.65);
+      box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.12);
+      outline: none;
+    }
+    select.field-dark option {
+      background: #101216;
+      color: #f4f4f5;
+    }
+    .thin-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+    .thin-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 999px; }
+    .thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .line-clamp-3 {
       display: -webkit-box;
       -webkit-line-clamp: 3;
@@ -34,7 +83,7 @@
     }
   </style>
 </head>
-<body class="min-h-screen bg-gray-900 text-gray-100 antialiased">
+<body class="min-h-screen bg-[#07080a] text-zinc-100 antialiased">
   <div id="app" class="min-h-screen"></div>
 
   <script>
@@ -66,23 +115,30 @@
     const normalize = (value) => String(value || '').toLowerCase().trim();
     const getLead = (id) => leads.find((lead) => lead.Lead_ID === id);
     const uniqueApproaches = () => [...new Set(leads.map((lead) => lead.Approach_Type).filter(Boolean))].sort();
+    const compactNumber = (value) => {
+      const digits = String(value || '').replace(/[^\d.]/g, '');
+      if (!digits) return value || '-';
+      const number = Number(digits);
+      if (!Number.isFinite(number)) return value || '-';
+      return Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(number);
+    };
 
     function tierClasses(tier) {
-      if (tier === 'A+') return { border: 'border-l-emerald-500', badge: 'bg-emerald-600 text-white ring-emerald-800/40' };
-      if (tier === 'A') return { border: 'border-l-green-500', badge: 'bg-green-600 text-white ring-green-800/40' };
-      if (tier === 'B') return { border: 'border-l-yellow-500', badge: 'bg-yellow-400 text-yellow-950 ring-yellow-700/40' };
-      if (tier === 'D') return { border: 'border-l-red-400', badge: 'bg-red-600 text-white ring-red-800/40' };
-      return { border: 'border-l-gray-400', badge: 'bg-gray-700 text-white ring-gray-900/30' };
+      if (tier === 'A+') return { border: 'border-l-teal-300', badge: 'bg-teal-300/10 text-teal-100 ring-teal-300/30', glow: 'shadow-[0_0_28px_rgba(45,212,191,.10)]' };
+      if (tier === 'A') return { border: 'border-l-emerald-400', badge: 'bg-emerald-400/10 text-emerald-100 ring-emerald-300/25', glow: 'shadow-[0_0_24px_rgba(52,211,153,.08)]' };
+      if (tier === 'B') return { border: 'border-l-amber-300', badge: 'bg-amber-300/10 text-amber-100 ring-amber-300/25', glow: 'shadow-[0_0_20px_rgba(251,191,36,.07)]' };
+      if (tier === 'D') return { border: 'border-l-rose-400', badge: 'bg-rose-400/10 text-rose-100 ring-rose-300/25', glow: 'shadow-[0_0_20px_rgba(251,113,133,.07)]' };
+      return { border: 'border-l-zinc-500', badge: 'bg-zinc-700/55 text-zinc-200 ring-white/10', glow: '' };
     }
 
     function statusAccent(status) {
       const colors = {
-        'Novo': { dot: 'bg-blue-500', text: 'text-blue-300', card: 'bg-blue-200 border-blue-400 border-l-blue-500 hover:bg-blue-300' },
-        'Contatado': { dot: 'bg-purple-500', text: 'text-purple-300', card: 'bg-purple-200 border-purple-400 border-l-purple-500 hover:bg-purple-300' },
-        'Respondeu': { dot: 'bg-yellow-500', text: 'text-yellow-200', card: 'bg-yellow-200 border-yellow-400 border-l-yellow-500 hover:bg-yellow-300' },
-        'Em negociação': { dot: 'bg-orange-500', text: 'text-orange-300', card: 'bg-orange-200 border-orange-400 border-l-orange-500 hover:bg-orange-300' }
+        'Novo': { dot: 'bg-sky-400', text: 'text-sky-200', ring: 'ring-sky-300/25', line: 'from-sky-400/70', border: 'border-l-sky-400' },
+        'Contatado': { dot: 'bg-violet-400', text: 'text-violet-200', ring: 'ring-violet-300/25', line: 'from-violet-400/70', border: 'border-l-violet-400' },
+        'Respondeu': { dot: 'bg-amber-300', text: 'text-amber-100', ring: 'ring-amber-300/25', line: 'from-amber-300/70', border: 'border-l-amber-300' },
+        'Em negociação': { dot: 'bg-orange-400', text: 'text-orange-100', ring: 'ring-orange-300/25', line: 'from-orange-400/70', border: 'border-l-orange-400' }
       };
-      return colors[status] || { dot: 'bg-gray-500', text: 'text-gray-300', card: 'bg-gray-200 border-gray-400 border-l-gray-500 hover:bg-gray-300' };
+      return colors[status] || { dot: 'bg-zinc-400', text: 'text-zinc-300', ring: 'ring-white/10', line: 'from-zinc-400/60', border: 'border-l-zinc-400' };
     }
 
     async function saveColumnLabels() {
@@ -103,10 +159,10 @@
 
     function activityDot(activity) {
       const value = normalize(activity);
-      if (value === 'high') return 'bg-green-500';
-      if (value === 'medium') return 'bg-yellow-500';
-      if (value === 'low') return 'bg-red-500';
-      return 'bg-gray-400';
+      if (value === 'high' || value === 'yes') return 'bg-teal-300';
+      if (value === 'medium') return 'bg-amber-300';
+      if (value === 'low' || value === 'no') return 'bg-rose-400';
+      return 'bg-zinc-500';
     }
 
     function resetColumnLimits() {
@@ -130,8 +186,64 @@
       });
     }
 
+    function renderFilterDropdown(filterKey, label, value, options) {
+      const current = options.find((option) => option.value === value) || options[0];
+      return `
+        <div class="relative" data-filter-dropdown>
+          <button type="button" data-filter-toggle="${escapeHtml(filterKey)}" aria-expanded="false" class="field-dark flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold">
+            <span class="truncate">${escapeHtml(label)}: ${escapeHtml(current.label)}</span>
+            <span class="text-xs text-zinc-500">v</span>
+          </button>
+          <div data-filter-menu class="hidden absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-xl border border-white/[0.09] bg-[#101216] p-1 shadow-[0_22px_60px_rgba(0,0,0,.45)]">
+            ${options.map((option) => `
+              <button type="button" data-filter-option data-filter-key="${escapeHtml(filterKey)}" data-filter-value="${escapeHtml(option.value)}" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold transition ${option.value === value ? 'bg-teal-300/10 text-teal-100' : 'text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-50'}">
+                <span>${escapeHtml(option.label)}</span>
+                ${option.value === value ? '<span class="h-1.5 w-1.5 rounded-full bg-teal-300"></span>' : ''}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function closeFilterDropdowns(exceptMenu = null) {
+      document.querySelectorAll('[data-filter-menu]').forEach((menu) => {
+        if (menu === exceptMenu) return;
+        menu.classList.add('hidden');
+        menu.parentElement?.querySelector('[data-filter-toggle]')?.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    function renderStatusDropdown(value) {
+      const currentLabel = statusLabel(value);
+      return `
+        <div class="relative mt-2 normal-case tracking-normal" data-status-dropdown>
+          <input id="status-input" type="hidden" value="${escapeHtml(value)}">
+          <button type="button" data-status-toggle aria-expanded="false" class="field-dark flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold">
+            <span class="truncate">${escapeHtml(currentLabel)}</span>
+            <span class="text-xs text-zinc-500">v</span>
+          </button>
+          <div data-status-menu class="hidden absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-white/[0.09] bg-[#101216] p-1 shadow-[0_22px_60px_rgba(0,0,0,.45)]">
+            ${STATUSES.map((status) => {
+              const accent = statusAccent(status);
+              const selected = status === value;
+              return `
+                <button type="button" data-status-option="${escapeHtml(status)}" class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold transition ${selected ? 'bg-teal-300/10 text-teal-100' : 'text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-50'}">
+                  <span class="flex min-w-0 items-center gap-2">
+                    <span class="h-2 w-2 shrink-0 rounded-full ${accent.dot}"></span>
+                    <span class="truncate">${escapeHtml(statusLabel(status))}</span>
+                  </span>
+                  ${selected ? '<span class="h-1.5 w-1.5 rounded-full bg-teal-300"></span>' : ''}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
     async function loadLeads() {
-      app.innerHTML = `<div class="flex min-h-screen items-center justify-center text-slate-500">Carregando leads...</div>`;
+      app.innerHTML = `<div class="app-shell flex min-h-screen items-center justify-center text-sm font-medium text-zinc-500">Carregando leads...</div>`;
 
       try {
         const response = await fetch(`${API_URL}?action=get_leads`);
@@ -147,26 +259,27 @@
           renderCRM();
         }
       } catch (error) {
-        app.innerHTML = `<div class="mx-auto flex min-h-screen max-w-xl items-center justify-center p-6">
-          <div class="rounded-lg border border-red-200 bg-red-50 p-5 text-red-700">${escapeHtml(error.message)}</div>
+        app.innerHTML = `<div class="app-shell mx-auto flex min-h-screen max-w-xl items-center justify-center p-6">
+          <div class="soft-panel rounded-xl p-5 text-sm text-rose-200">${escapeHtml(error.message)}</div>
         </div>`;
       }
     }
 
     function renderImportScreen(message = '') {
       app.innerHTML = `
-        <main class="flex min-h-screen items-center justify-center px-4 py-10">
-          <section class="w-full max-w-xl rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
-            <div class="mb-6 text-center">
-              <div class="mb-4 text-4xl">📋</div>
-              <h1 class="text-2xl font-semibold tracking-tight text-slate-950">Nenhum lead importado ainda</h1>
+        <main class="app-shell flex min-h-screen items-center justify-center px-4 py-10">
+          <section class="soft-panel w-full max-w-xl rounded-2xl p-8">
+            <div class="mb-7">
+              <p class="mb-3 text-xs font-bold uppercase tracking-[0.28em] text-teal-200/80">Real Estate CRM</p>
+              <h1 class="text-2xl font-semibold tracking-tight text-zinc-50">Nenhum lead importado ainda</h1>
+              <p class="mt-2 text-sm leading-6 text-zinc-400">Importe o CSV para montar o board de leads e iniciar a triagem.</p>
             </div>
             <form id="import-form" class="space-y-5">
-              <input id="csv-file" name="csv" type="file" accept=".csv,text/csv" class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-800">
-              <button type="submit" class="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Importar</button>
+              <input id="csv-file" name="csv" type="file" accept=".csv,text/csv" class="block w-full rounded-xl field-dark px-3 py-2 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-zinc-950">
+              <button type="submit" class="w-full rounded-xl bg-teal-300 px-4 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-teal-200">Importar CSV</button>
             </form>
-            <p class="mt-5 text-center text-sm leading-6 text-slate-500">Formato esperado: CSV com headers na primeira linha, separador vírgula.</p>
-            <p id="import-message" class="mt-4 text-center text-sm text-slate-500">${escapeHtml(message)}</p>
+            <p class="mt-5 text-sm leading-6 text-zinc-500">Formato esperado: CSV com headers na primeira linha, separador virgula.</p>
+            <p id="import-message" class="mt-4 text-sm text-zinc-400">${escapeHtml(message)}</p>
           </section>
         </main>
       `;
@@ -176,37 +289,40 @@
     function renderCRM(options = {}) {
       const approaches = uniqueApproaches();
       const visibleLeads = filteredLeads();
+      const tierDropdownOptions = TIER_OPTIONS.map((tier) => ({ value: tier, label: tier === 'All' ? 'All' : tier }));
+      const approachDropdownOptions = [
+        { value: 'All', label: 'All' },
+        ...approaches.map((approach) => ({ value: approach, label: approach }))
+      ];
       const shouldRestoreSearchFocus = options.restoreSearchFocus || document.activeElement?.id === 'search-filter';
       const searchCursor = document.getElementById('search-filter')?.selectionStart ?? filters.search.length;
 
       app.innerHTML = `
-        <div class="min-h-screen">
-          <header class="border-b border-gray-800 bg-gray-950/80 px-4 py-4">
-            <div class="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <h1 class="text-xl font-semibold tracking-tight text-white">Real Estate CRM</h1>
+        <div class="app-shell min-h-screen">
+          <header class="sticky top-0 z-30 border-b border-white/[0.07] bg-[#07080a]/80 px-4 py-4 backdrop-blur-xl">
+            <div class="mx-auto flex max-w-[1760px] flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-teal-200/70">Pipeline</p>
+                <h1 class="mt-1 text-xl font-semibold tracking-tight text-zinc-50">Real Estate CRM</h1>
+              </div>
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <button id="open-import" class="rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-100 hover:bg-gray-800">Importar CSV</button>
-                <div class="rounded-md bg-gray-800 px-4 py-2 text-sm text-gray-300">Contador: <span class="font-semibold text-white">${visibleLeads.length}</span></div>
+                <button id="open-import" class="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-zinc-100 transition hover:border-teal-300/40 hover:bg-teal-300/10">Importar CSV</button>
+                <div class="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-zinc-400">Leads visiveis <span class="ml-2 font-bold text-zinc-50">${visibleLeads.length}</span></div>
               </div>
             </div>
           </header>
 
-          <section class="border-b border-gray-800 bg-gray-900 px-4 py-4">
-            <div class="mx-auto grid max-w-7xl gap-3 md:grid-cols-[1fr_160px_240px_auto]">
-              <input id="search-filter" type="search" placeholder="🔍 Buscar por nome..." value="${escapeHtml(filters.search)}" class="rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-green-500">
-              <select id="tier-filter" class="rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-green-500">
-                ${TIER_OPTIONS.map((tier) => `<option value="${tier}" ${filters.tier === tier ? 'selected' : ''}>${tier === 'All' ? 'Tier: All' : tier}</option>`).join('')}
-              </select>
-              <select id="approach-filter" class="rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-green-500">
-                <option value="All">Approach: All</option>
-                ${approaches.map((approach) => `<option value="${escapeHtml(approach)}" ${filters.approach === approach ? 'selected' : ''}>${escapeHtml(approach)}</option>`).join('')}
-              </select>
-              <button id="clear-filters" class="rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-gray-100 hover:bg-gray-700">Limpar</button>
+          <section class="border-b border-white/[0.06] px-4 py-4">
+            <div class="mx-auto grid max-w-[1760px] gap-3 md:grid-cols-[minmax(260px,1fr)_160px_240px_auto]">
+              <input id="search-filter" type="search" placeholder="Buscar por nome" value="${escapeHtml(filters.search)}" class="field-dark rounded-xl px-3.5 py-2.5 text-sm">
+              ${renderFilterDropdown('tier', 'Tier', filters.tier, tierDropdownOptions)}
+              ${renderFilterDropdown('approach', 'Approach', filters.approach, approachDropdownOptions)}
+              <button id="clear-filters" class="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.08]">Limpar</button>
             </div>
           </section>
 
-          <main class="overflow-x-auto px-4 py-5">
-            <div class="mx-auto flex w-max max-w-[1800px] justify-center gap-4 pb-4 xl:w-full">
+          <main class="thin-scrollbar overflow-x-auto px-4 py-5">
+            <div class="mx-auto flex w-max max-w-[1760px] justify-center gap-4 pb-4 xl:w-full">
               ${STATUSES.map((status) => renderColumn(status, visibleLeads.filter((lead) => (lead.Status || 'Novo') === status))).join('')}
             </div>
           </main>
@@ -233,17 +349,18 @@
       const label = columnLabels[status] || status;
 
       return `
-        <section class="flex h-[calc(100vh-180px)] min-w-[360px] flex-1 flex-col rounded-lg border border-gray-800 bg-gray-950 xl:min-w-0">
-          <div class="flex items-center justify-between border-b border-gray-800 px-4 py-3">
+        <section class="flex h-[calc(100vh-190px)] min-w-[350px] flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.07] bg-zinc-950/70 shadow-[0_18px_60px_rgba(0,0,0,.22)] backdrop-blur xl:min-w-0">
+          <div class="relative flex items-center justify-between border-b border-white/[0.07] px-4 py-3.5">
+            <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r ${accent.line} via-white/10 to-transparent"></div>
             <div class="flex min-w-0 items-center gap-2">
-              <span class="h-2.5 w-2.5 shrink-0 rounded-full ${accent.dot}"></span>
-              <input data-column-label="${escapeHtml(status)}" value="${escapeHtml(label)}" class="column-label min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-1 py-0.5 font-semibold ${accent.text} outline-none hover:border-gray-700 focus:border-gray-600 focus:bg-gray-900">
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full ${accent.dot} shadow-[0_0_14px_currentColor]"></span>
+              <input data-column-label="${escapeHtml(status)}" value="${escapeHtml(label)}" class="column-label min-w-0 flex-1 truncate rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-sm font-bold ${accent.text} outline-none transition hover:border-white/10 focus:border-white/15 focus:bg-white/[0.04]">
             </div>
-            <span class="rounded-full bg-gray-800 px-2.5 py-1 text-xs text-gray-300">${columnLeads.length}</span>
+            <span class="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-xs font-bold text-zinc-300">${columnLeads.length}</span>
           </div>
-          <div class="space-y-3 overflow-y-auto no-scrollbar p-3">
-            ${visibleColumnLeads.map((lead) => renderLeadCard(lead, status)).join('') || '<p class="px-2 py-4 text-sm text-gray-500">Sem leads</p>'}
-            ${hasMore ? `<button type="button" data-load-more="${escapeHtml(status)}" class="load-more w-full rounded-md border border-gray-700 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-800">Carregar mais</button>` : ''}
+          <div class="thin-scrollbar space-y-3 overflow-y-auto p-3">
+            ${visibleColumnLeads.map((lead) => renderLeadCard(lead, status)).join('') || '<p class="px-2 py-4 text-sm text-zinc-500">Sem leads</p>'}
+            ${hasMore ? `<button type="button" data-load-more="${escapeHtml(status)}" class="load-more w-full rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-white/[0.06]">Carregar mais</button>` : ''}
           </div>
         </section>
       `;
@@ -291,63 +408,77 @@
     function renderCardLink(label, url, type) {
       const href = normalizeSocialUrl(type, url);
       if (!href) {
-        return `<span class="text-xs font-semibold text-gray-500">${label}: -</span>`;
+        return `<span class="rounded-full border border-white/[0.06] px-2 py-1 text-[11px] font-bold text-zinc-600">${label}</span>`;
       }
 
-      return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" class="card-link text-xs font-semibold text-gray-900 underline decoration-gray-500 underline-offset-4 hover:text-black">${label}</a>`;
+      return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" class="card-link rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-bold text-zinc-300 transition hover:border-teal-300/40 hover:text-teal-100">${label}</a>`;
     }
 
     function renderSwotList(items, emptyText) {
       const visibleItems = items.slice(0, 3);
       if (!visibleItems.length) {
-        return `<p class="text-xs leading-4 text-gray-500">${emptyText}</p>`;
+        return `<p class="text-xs leading-4 text-zinc-600">${emptyText}</p>`;
       }
 
-      return visibleItems.map((item) => `<p class="swot-item swot-item-clamp text-xs leading-4 text-gray-700" title="${escapeHtml(item)}">${escapeHtml(item)}</p>`).join('');
+      return visibleItems.map((item) => `<p class="swot-item swot-item-clamp text-xs leading-4 text-zinc-400" title="${escapeHtml(item)}">${escapeHtml(item)}</p>`).join('');
     }
 
     function renderLeadCard(lead, status) {
       const tier = lead.New_Tier || lead.Tier_Fase1 || 'C';
       const classes = tierClasses(tier);
-      const dot = activityDot(lead.IG_Activity);
       const accent = statusAccent(status);
+      const dot = activityDot(lead.IG_Activity);
       const swot = splitShortNote(lead.Short_Note);
       const score = lead.Score_Fase1 || lead.Brand_Score || '-';
+      const liAudience = lead.LI_Followers || lead.LI_Connections || '-';
 
       return `
-        <article data-lead-id="${escapeHtml(lead.Lead_ID)}" tabindex="0" class="lead-card w-full cursor-pointer rounded-md border ${accent.card} border-l-4 p-4 text-left text-gray-900 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-white/70">
-          <div class="mb-2 flex items-start gap-2">
-            <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${classes.badge}">${escapeHtml(tier)}</span>
+        <article data-lead-id="${escapeHtml(lead.Lead_ID)}" tabindex="0" class="lead-card group w-full cursor-pointer rounded-2xl border border-white/[0.08] ${accent.border} ${classes.glow} border-l-4 bg-[#101216]/92 p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-white/[0.16] hover:bg-[#14171d] focus:outline-none focus:ring-2 focus:ring-teal-200/35">
+          <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <h3 class="truncate font-semibold">${escapeHtml(lead.Name)}</h3>
-              <p class="truncate text-xs text-gray-500">${escapeHtml(lead.Type)} · ${escapeHtml(lead.Gender)}</p>
+              <h3 class="truncate text-sm font-bold tracking-[-0.01em] text-zinc-50">${escapeHtml(lead.Name)}</h3>
+              <p class="mt-1 truncate text-xs font-medium text-zinc-500">${escapeHtml(lead.Type)} - ${escapeHtml(lead.Gender)}</p>
+            </div>
+            <span class="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ${classes.badge}">${escapeHtml(tier)}</span>
+          </div>
+          <div class="mt-4 grid grid-cols-3 gap-2">
+            <div class="rounded-xl border border-white/[0.07] bg-white/[0.035] px-2.5 py-2">
+              <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-600">Score</p>
+              <p class="mt-0.5 text-sm font-bold text-zinc-100">${escapeHtml(score)}</p>
+            </div>
+            <div class="rounded-xl border border-white/[0.07] bg-white/[0.035] px-2.5 py-2">
+              <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-600">Brand</p>
+              <p class="mt-0.5 text-sm font-bold text-zinc-100">${escapeHtml(lead.Brand_Score || '-')}</p>
+            </div>
+            <div class="rounded-xl border border-white/[0.07] bg-white/[0.035] px-2.5 py-2">
+              <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-600">IG</p>
+              <p class="mt-0.5 text-sm font-bold text-zinc-100">${escapeHtml(compactNumber(lead.IG_Followers))}</p>
             </div>
           </div>
-          <div class="mt-2 grid grid-cols-2 gap-3 text-sm text-gray-700">
-            <p>Score: <span class="font-semibold text-gray-950">${escapeHtml(score)}</span></p>
-            <p>Brand: <span class="font-semibold text-gray-950">${escapeHtml(lead.Brand_Score || '-')}</span></p>
+          <div class="mt-3">
+            <p class="line-clamp-2 text-sm font-semibold leading-5 text-zinc-200">${escapeHtml(lead.Recommended_Angle || '-')}</p>
+            <p class="mt-1 truncate text-xs text-zinc-500">Approach: <span class="font-semibold text-zinc-300">${escapeHtml(lead.Approach_Type || '-')}</span></p>
           </div>
-          <p class="mt-1 truncate text-sm text-gray-700">Angle: <span class="font-medium text-gray-900">${escapeHtml(lead.Recommended_Angle || '-')}</span></p>
           <div class="mt-2 flex flex-wrap gap-2">
             ${renderCardLink('Instagram', lead.Instagram, 'instagram')}
             ${renderCardLink('LinkedIn', lead.Linkedin, 'linkedin')}
           </div>
-          <div class="mt-2 grid gap-0.5 text-sm text-gray-700">
-            <p class="truncate">IG: <span class="font-medium">${escapeHtml(lead.IG_Followers || '-')}</span> seguidores · <span class="font-medium">${escapeHtml(lead.IG_Posts_30d || '-')}</span> posts/30d</p>
-            <p class="truncate">LI: <span class="font-medium">${escapeHtml(lead.LI_Followers || lead.LI_Connections || '-')}</span> · <span class="font-medium">${escapeHtml(lead.LI_Company || '-')}</span></p>
+          <div class="mt-3 grid gap-1 text-xs leading-5 text-zinc-500">
+            <p class="truncate">IG <span class="font-semibold text-zinc-300">${escapeHtml(compactNumber(lead.IG_Followers))}</span> - <span class="font-semibold text-zinc-300">${escapeHtml(lead.IG_Posts_30d || '-')}</span> posts/30d</p>
+            <p class="truncate">LI <span class="font-semibold text-zinc-300">${escapeHtml(compactNumber(liAudience))}</span> - <span class="font-semibold text-zinc-300">${escapeHtml(lead.LI_Company || '-')}</span></p>
           </div>
-          <p class="mt-1 flex items-center gap-2 text-sm text-gray-700"><span class="h-2.5 w-2.5 rounded-full ${dot}"></span>IG Activity: <span class="font-medium">${escapeHtml(lead.IG_Activity || '-')}</span></p>
-          <div class="mt-3 min-w-0 overflow-hidden border-t border-gray-300/70 pt-3">
-            <p class="mb-1 text-xs font-bold uppercase tracking-wide text-gray-700">Observação</p>
-            <p class="swot-item swot-item-clamp text-xs leading-4 text-gray-700" title="${escapeHtml(lead.Observação || '')}">${escapeHtml(lead.Observação || 'Sem observação.')}</p>
+          <p class="mt-2 flex items-center gap-2 text-xs font-semibold text-zinc-400"><span class="h-2 w-2 rounded-full ${dot}"></span>IG Activity: ${escapeHtml(lead.IG_Activity || '-')}</p>
+          <div class="mt-3 min-w-0 overflow-hidden border-t border-white/[0.07] pt-3">
+            <p class="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-600">Observacao</p>
+            <p class="swot-item swot-item-clamp text-xs leading-4 text-zinc-400" title="${escapeHtml(lead.Observação || '')}">${escapeHtml(lead.Observação || 'Sem observacao.')}</p>
           </div>
-          <div class="mt-3 grid min-w-0 gap-2 overflow-hidden border-t border-gray-300/70 pt-3">
+          <div class="mt-3 grid min-w-0 gap-2 overflow-hidden border-t border-white/[0.07] pt-3">
             <div class="min-w-0 overflow-hidden">
-              <p class="mb-1 text-xs font-bold uppercase tracking-wide text-green-700">Positivos</p>
+              <p class="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-teal-300/70">Positivos</p>
               ${renderSwotList(swot.positives, 'Sem pontos positivos no Short_Note.')}
             </div>
             <div class="min-w-0 overflow-hidden">
-              <p class="mb-1 text-xs font-bold uppercase tracking-wide text-red-700">Negativos</p>
+              <p class="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-rose-300/70">Negativos</p>
               ${renderSwotList(swot.negatives, 'Sem pontos negativos no Short_Note.')}
             </div>
           </div>
@@ -410,16 +541,27 @@
         renderCRM({ restoreSearchFocus: true });
       });
 
-      document.getElementById('tier-filter').addEventListener('change', (event) => {
-        filters.tier = event.target.value;
-        resetColumnLimits();
-        renderCRM();
+      document.querySelectorAll('[data-filter-toggle]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const menu = button.parentElement.querySelector('[data-filter-menu]');
+          const shouldOpen = menu.classList.contains('hidden');
+          closeFilterDropdowns(menu);
+          menu.classList.toggle('hidden', !shouldOpen);
+          button.setAttribute('aria-expanded', String(shouldOpen));
+          if (shouldOpen) {
+            setTimeout(() => document.addEventListener('click', () => closeFilterDropdowns(), { once: true }), 0);
+          }
+        });
       });
 
-      document.getElementById('approach-filter').addEventListener('change', (event) => {
-        filters.approach = event.target.value;
-        resetColumnLimits();
-        renderCRM();
+      document.querySelectorAll('[data-filter-option]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          filters[button.dataset.filterKey] = button.dataset.filterValue;
+          resetColumnLimits();
+          renderCRM();
+        });
       });
 
       document.getElementById('clear-filters').addEventListener('click', () => {
@@ -436,78 +578,76 @@
 
       const root = document.getElementById('modal-root');
       root.innerHTML = `
-        <div class="fixed inset-0 z-40 overflow-y-auto bg-black/60 p-4 backdrop-blur-sm">
-          <div class="mx-auto my-6 max-w-4xl rounded-lg border border-gray-700 bg-gray-900 shadow-2xl">
-            <div class="flex items-start justify-between gap-4 border-b border-gray-800 p-6">
+        <div class="fixed inset-0 z-40 overflow-y-auto bg-black/72 p-4 backdrop-blur-md">
+          <div class="mx-auto my-6 max-w-5xl overflow-hidden rounded-2xl border border-white/[0.09] bg-[#0d0f13] shadow-[0_30px_100px_rgba(0,0,0,.55)]">
+            <div class="flex items-start justify-between gap-4 border-b border-white/[0.07] bg-white/[0.025] p-6">
               <div>
-                <h2 class="text-2xl font-semibold text-white">${escapeHtml(lead.Name)}</h2>
-                <p class="mt-1 text-sm text-gray-400">${escapeHtml(lead.Type)} · ${escapeHtml(lead.Gender)} · New Tier: ${escapeHtml(lead.New_Tier)}</p>
+                <h2 class="text-2xl font-semibold tracking-tight text-zinc-50">${escapeHtml(lead.Name)}</h2>
+                <p class="mt-1 text-sm text-zinc-500">${escapeHtml(lead.Type)} - ${escapeHtml(lead.Gender)} - New Tier: ${escapeHtml(lead.New_Tier)}</p>
               </div>
-              <button id="close-modal" class="rounded-md border border-gray-700 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-800">X fechar</button>
+              <button id="close-modal" class="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.08]">Fechar</button>
             </div>
 
-            <div class="border-b border-gray-800 p-6">
+            <div class="border-b border-white/[0.07] p-6">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-                <label class="flex-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Status
-                  <select id="status-input" class="mt-2 w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm normal-case tracking-normal text-white">
-                    ${STATUSES.map((status) => `<option value="${status}" ${(lead.Status || 'Novo') === status ? 'selected' : ''}>${escapeHtml(statusLabel(status))}</option>`).join('')}
-                  </select>
+                <label class="flex-1 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Status
+                  ${renderStatusDropdown(lead.Status || 'Novo')}
                 </label>
-                <button data-save-field="Status" class="rounded-md bg-green-500 px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-green-400">Salvar</button>
+                <button data-save-field="Status" class="rounded-xl bg-teal-300 px-4 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-teal-200">Salvar</button>
               </div>
             </div>
 
-            <div class="grid gap-0 border-b border-gray-800 md:grid-cols-2">
-              <section class="border-b border-gray-800 p-6 md:border-b-0 md:border-r md:border-gray-800">
-                <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Contato</h3>
-                ${contactLine('📞', lead.Phone)}
-                ${contactLine('📧', lead.Email)}
-                ${linkLine('🌐', lead.Website, lead.Website)}
+            <div class="grid gap-0 border-b border-white/[0.07] md:grid-cols-2">
+              <section class="border-b border-white/[0.07] p-6 md:border-b-0 md:border-r md:border-white/[0.07]">
+                <h3 class="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Contato</h3>
+                ${contactLine('Phone', lead.Phone)}
+                ${contactLine('Email', lead.Email)}
+                ${linkLine('Website', lead.Website, lead.Website)}
               </section>
               <section class="p-6">
-                <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Redes sociais</h3>
+                <h3 class="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Redes sociais</h3>
                 ${linkLine('Instagram', normalizeSocialUrl('instagram', lead.Instagram), `${lead.Instagram || ''} (${lead.IG_Followers || ''})`)}
-                <p class="mt-2 text-sm text-gray-300">Posts/30d: ${escapeHtml(lead.IG_Posts_30d)} | Activity: ${escapeHtml(lead.IG_Activity)}</p>
-                <div class="my-4 border-t border-gray-800"></div>
+                <p class="mt-2 text-sm text-zinc-400">Posts/30d: ${escapeHtml(lead.IG_Posts_30d)} | Activity: ${escapeHtml(lead.IG_Activity)}</p>
+                <div class="my-4 border-t border-white/[0.07]"></div>
                 ${linkLine('LinkedIn', normalizeSocialUrl('linkedin', lead.Linkedin), `${lead.LI_Followers || ''} followers`)}
-                <p class="mt-2 text-sm text-gray-300">${escapeHtml(lead.LI_Company)} | ${escapeHtml(lead.LI_Headline)}</p>
+                <p class="mt-2 text-sm text-zinc-400">${escapeHtml(lead.LI_Company)} | ${escapeHtml(lead.LI_Headline)}</p>
               </section>
             </div>
 
-            <section class="border-b border-gray-800 p-6">
-              <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Qualificação</h3>
-              <div class="space-y-2 text-sm text-gray-300">
+            <section class="border-b border-white/[0.07] p-6">
+              <h3 class="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Qualificacao</h3>
+              <div class="space-y-2 text-sm leading-6 text-zinc-300">
                 <p>Score Fase1: ${escapeHtml(lead.Score_Fase1)} | Tier Fase1: ${escapeHtml(lead.Tier_Fase1)} | Brand Score: ${escapeHtml(lead.Brand_Score)}</p>
                 <p>Angle: ${escapeHtml(lead.Recommended_Angle)}</p>
                 <p>Approach: ${escapeHtml(lead.Approach_Type)}</p>
-                <p>Website: ${escapeHtml(lead.Website)} ✓ (match: ${escapeHtml(lead.Website_Match)})</p>
+                <p>Website: ${escapeHtml(lead.Website)} (match: ${escapeHtml(lead.Website_Match)})</p>
                 <p>Website Summary: ${escapeHtml(lead.Website_Summary)}</p>
               </div>
             </section>
 
-            <section class="border-b border-gray-800 p-6">
+            <section class="border-b border-white/[0.07] p-6">
               <div class="mb-3 flex items-center justify-between">
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400">Primeira mensagem</h3>
-                <button id="copy-message" class="rounded-md border border-gray-700 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-800">Copiar</button>
+                <h3 class="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Primeira mensagem</h3>
+                <button id="copy-message" class="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.08]">Copiar</button>
               </div>
-              <div class="border-l-2 border-gray-700 pl-4 text-sm leading-6 text-gray-200">${escapeHtml(lead.First_Message)}</div>
+              <div class="rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4 text-sm leading-6 text-zinc-200">${escapeHtml(lead.First_Message)}</div>
             </section>
 
-            <section class="border-b border-gray-800 p-6">
+            <section class="border-b border-white/[0.07] p-6">
               <div class="mb-3 flex items-center justify-between gap-3">
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400">Observação (campo editável do CSV)</h3>
-                <button data-save-field="Observação" class="rounded-md bg-green-500 px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-green-400">Salvar</button>
+                <h3 class="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Observacao</h3>
+                <button data-save-field="Observação" class="rounded-xl bg-teal-300 px-4 py-2 text-sm font-bold text-zinc-950 transition hover:bg-teal-200">Salvar</button>
               </div>
-              <textarea id="observacao-input" rows="4" class="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white">${escapeHtml(lead.Observação)}</textarea>
+              <textarea id="observacao-input" rows="4" class="field-dark w-full rounded-xl px-3 py-2 text-sm">${escapeHtml(lead.Observação)}</textarea>
             </section>
 
             <section class="p-6">
               <div class="mb-3 flex items-center justify-between gap-3">
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400">Notas internas (campo novo, não vem do CSV)</h3>
-                <button data-save-field="Internal_Notes" class="rounded-md bg-green-500 px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-green-400">Salvar</button>
+                <h3 class="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Notas internas</h3>
+                <button data-save-field="Internal_Notes" class="rounded-xl bg-teal-300 px-4 py-2 text-sm font-bold text-zinc-950 transition hover:bg-teal-200">Salvar</button>
               </div>
-              <textarea id="notes-input" rows="4" class="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white">${escapeHtml(lead.Internal_Notes)}</textarea>
-              <p id="modal-message" class="mt-3 text-sm text-gray-400"></p>
+              <textarea id="notes-input" rows="4" class="field-dark w-full rounded-xl px-3 py-2 text-sm">${escapeHtml(lead.Internal_Notes)}</textarea>
+              <p id="modal-message" class="mt-3 text-sm text-zinc-400"></p>
             </section>
           </div>
         </div>
@@ -516,15 +656,39 @@
       document.getElementById('close-modal').addEventListener('click', closeModal);
       document.querySelectorAll('[data-save-field]').forEach((button) => button.addEventListener('click', () => saveField(button.dataset.saveField)));
       document.getElementById('copy-message').addEventListener('click', copyFirstMessage);
+      const statusToggle = document.querySelector('[data-status-toggle]');
+      const statusMenu = document.querySelector('[data-status-menu]');
+      statusToggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const shouldOpen = statusMenu.classList.contains('hidden');
+        statusMenu.classList.toggle('hidden', !shouldOpen);
+        statusToggle.setAttribute('aria-expanded', String(shouldOpen));
+        if (shouldOpen) {
+          setTimeout(() => document.addEventListener('click', () => {
+            statusMenu.classList.add('hidden');
+            statusToggle.setAttribute('aria-expanded', 'false');
+          }, { once: true }), 0);
+        }
+      });
+      document.querySelectorAll('[data-status-option]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          document.getElementById('status-input').value = button.dataset.statusOption;
+          statusMenu.classList.add('hidden');
+          statusToggle.setAttribute('aria-expanded', 'false');
+          const label = statusToggle.querySelector('span');
+          label.textContent = statusLabel(button.dataset.statusOption);
+        });
+      });
     }
 
     function contactLine(icon, text) {
-      return `<p class="mt-2 break-words text-sm text-gray-300">${icon} ${escapeHtml(text)}</p>`;
+      return `<p class="mt-2 break-words text-sm text-zinc-300">${icon} ${escapeHtml(text)}</p>`;
     }
 
     function linkLine(label, url, text) {
-      if (!url) return `<p class="mt-2 text-sm text-gray-500">${escapeHtml(label)}: -</p>`;
-      return `<p class="mt-2 break-words text-sm text-gray-300">${escapeHtml(label)}: <a class="font-medium text-green-300 underline decoration-green-700 underline-offset-4 hover:text-green-200" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text || url)}</a></p>`;
+      if (!url) return `<p class="mt-2 text-sm text-zinc-600">${escapeHtml(label)}: -</p>`;
+      return `<p class="mt-2 break-words text-sm text-zinc-300">${escapeHtml(label)}: <a class="font-semibold text-teal-200 underline decoration-teal-500/35 underline-offset-4 hover:text-teal-100" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text || url)}</a></p>`;
     }
 
     function closeModal() {
@@ -574,18 +738,18 @@
     function renderImportModal() {
       const root = document.getElementById('import-root');
       root.innerHTML = `
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-sm">
-          <section class="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-xl">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/72 p-4 backdrop-blur-md">
+          <section class="soft-panel w-full max-w-lg rounded-2xl p-6">
             <div class="mb-5 flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-950">Importar CSV</h2>
-              <button id="close-import" class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">X fechar</button>
+              <h2 class="text-lg font-semibold text-zinc-50">Importar CSV</h2>
+              <button id="close-import" class="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.08]">Fechar</button>
             </div>
             <form id="import-form" class="space-y-5">
-              <input id="csv-file" name="csv" type="file" accept=".csv,text/csv" class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-800">
-              <button type="submit" class="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Importar</button>
+              <input id="csv-file" name="csv" type="file" accept=".csv,text/csv" class="block w-full rounded-xl field-dark px-3 py-2 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-zinc-950">
+              <button type="submit" class="w-full rounded-xl bg-teal-300 px-4 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-teal-200">Importar CSV</button>
             </form>
-            <p class="mt-5 text-sm leading-6 text-slate-500">Formato esperado: CSV com headers na primeira linha, separador vírgula.</p>
-            <p id="import-message" class="mt-4 text-sm text-slate-500"></p>
+            <p class="mt-5 text-sm leading-6 text-zinc-500">Formato esperado: CSV com headers na primeira linha, separador virgula.</p>
+            <p id="import-message" class="mt-4 text-sm text-zinc-400"></p>
           </section>
         </div>
       `;
@@ -610,7 +774,8 @@
           const response = await fetch(`${API_URL}?action=import`, { method: 'POST', body: formData });
           const data = await response.json();
           if (!data.success) throw new Error(data.error || 'Erro no import');
-          window.location.reload();
+          messageEl.textContent = `Importado: ${data.imported} leads (${data.new} novos, ${data.updated} atualizados)`;
+          setTimeout(() => window.location.reload(), 2000);
         } catch (error) {
           messageEl.textContent = error.message;
         }
