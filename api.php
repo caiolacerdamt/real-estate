@@ -10,6 +10,7 @@ function default_column_labels() {
     return array(
         'Novo' => 'Novo',
         'Contatado' => 'Contatado',
+        'Qualificado' => 'Qualificado',
         'Respondeu' => 'Respondeu',
         'Em negociação' => 'Em negociação'
     );
