@@ -11,8 +11,9 @@ function default_column_labels() {
         'Novo' => 'Novo',
         'Contatado' => 'Contatado',
         'Qualificado' => 'Qualificado',
-        'Respondeu' => 'Respondeu',
-        'Em negociação' => 'Em negociação'
+        'Top Agents' => 'Top Agents',
+        'Em negociação' => 'Em negociação',
+        'Respondeu' => 'Respondeu'
     );
 }
 

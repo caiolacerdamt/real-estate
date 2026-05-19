@@ -88,13 +88,14 @@
 
   <script>
     const API_URL = 'api.php';
-    const STATUSES = ['Novo', 'Contatado', 'Qualificado', 'Respondeu', 'Em negociação'];
+    const STATUSES = ['Novo', 'Contatado', 'Qualificado', 'Top Agents', 'Em negociação', 'Respondeu'];
     const DEFAULT_COLUMN_LABELS = {
       'Novo': 'Novo',
       'Contatado': 'Contatado',
       'Qualificado': 'Qualificado',
-      'Respondeu': 'Respondeu',
-      'Em negociação': 'Em negociação'
+      'Top Agents': 'Top Agents',
+      'Em negociação': 'Em negociação',
+      'Respondeu': 'Respondeu'
     };
     const TIER_OPTIONS = ['All', 'A+', 'A', 'B', 'C', 'D'];
     const PAGE_SIZE = 15;
@@ -137,8 +138,9 @@
         'Novo': { dot: 'bg-sky-400', text: 'text-sky-200', ring: 'ring-sky-300/25', line: 'from-sky-400/70', border: 'border-l-sky-400' },
         'Contatado': { dot: 'bg-violet-400', text: 'text-violet-200', ring: 'ring-violet-300/25', line: 'from-violet-400/70', border: 'border-l-violet-400' },
         'Qualificado': { dot: 'bg-lime-400', text: 'text-lime-200', ring: 'ring-lime-300/25', line: 'from-lime-400/70', border: 'border-l-lime-400' },
-        'Respondeu': { dot: 'bg-amber-300', text: 'text-amber-100', ring: 'ring-amber-300/25', line: 'from-amber-300/70', border: 'border-l-amber-300' },
-        'Em negociação': { dot: 'bg-orange-400', text: 'text-orange-100', ring: 'ring-orange-300/25', line: 'from-orange-400/70', border: 'border-l-orange-400' }
+        'Top Agents': { dot: 'bg-fuchsia-400', text: 'text-fuchsia-200', ring: 'ring-fuchsia-300/25', line: 'from-fuchsia-400/70', border: 'border-l-fuchsia-400' },
+        'Em negociação': { dot: 'bg-orange-400', text: 'text-orange-100', ring: 'ring-orange-300/25', line: 'from-orange-400/70', border: 'border-l-orange-400' },
+        'Respondeu': { dot: 'bg-amber-300', text: 'text-amber-100', ring: 'ring-amber-300/25', line: 'from-amber-300/70', border: 'border-l-amber-300' }
       };
       return colors[status] || { dot: 'bg-zinc-400', text: 'text-zinc-300', ring: 'ring-white/10', line: 'from-zinc-400/60', border: 'border-l-zinc-400' };
     }
