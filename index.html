@@ -88,14 +88,15 @@
 
   <script>
     const API_URL = 'api.php';
-    const STATUSES = ['Novo', 'Contatado', 'Qualificado', 'Top Agents', 'Em negociação', 'Respondeu'];
+    const STATUSES = ['Novo', 'Contatado', 'Qualificado', 'Top Agents', 'Em negociação', 'Respondeu', 'Fechado'];
     const DEFAULT_COLUMN_LABELS = {
       'Novo': 'Novo',
       'Contatado': 'Contatado',
       'Qualificado': 'Qualificado',
       'Top Agents': 'Top Agents',
       'Em negociação': 'Em negociação',
-      'Respondeu': 'Respondeu'
+      'Respondeu': 'Respondeu',
+      'Fechado': 'Fechado'
     };
     const TIER_OPTIONS = ['All', 'A+', 'A', 'B', 'C', 'D'];
     const PAGE_SIZE = 15;
@@ -140,7 +141,8 @@
         'Qualificado': { dot: 'bg-lime-400', text: 'text-lime-200', ring: 'ring-lime-300/25', line: 'from-lime-400/70', border: 'border-l-lime-400' },
         'Top Agents': { dot: 'bg-fuchsia-400', text: 'text-fuchsia-200', ring: 'ring-fuchsia-300/25', line: 'from-fuchsia-400/70', border: 'border-l-fuchsia-400' },
         'Em negociação': { dot: 'bg-orange-400', text: 'text-orange-100', ring: 'ring-orange-300/25', line: 'from-orange-400/70', border: 'border-l-orange-400' },
-        'Respondeu': { dot: 'bg-amber-300', text: 'text-amber-100', ring: 'ring-amber-300/25', line: 'from-amber-300/70', border: 'border-l-amber-300' }
+        'Respondeu': { dot: 'bg-amber-300', text: 'text-amber-100', ring: 'ring-amber-300/25', line: 'from-amber-300/70', border: 'border-l-amber-300' },
+        'Fechado': { dot: 'bg-emerald-400', text: 'text-emerald-200', ring: 'ring-emerald-300/25', line: 'from-emerald-400/70', border: 'border-l-emerald-400' }
       };
       return colors[status] || { dot: 'bg-zinc-400', text: 'text-zinc-300', ring: 'ring-white/10', line: 'from-zinc-400/60', border: 'border-l-zinc-400' };
     }

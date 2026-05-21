@@ -13,7 +13,8 @@ function default_column_labels() {
         'Qualificado' => 'Qualificado',
         'Top Agents' => 'Top Agents',
         'Em negociação' => 'Em negociação',
-        'Respondeu' => 'Respondeu'
+        'Respondeu' => 'Respondeu',
+        'Fechado' => 'Fechado'
     );
 }
 
