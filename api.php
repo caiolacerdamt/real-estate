@@ -356,10 +356,6 @@ try {
     }
 
     if ($action === 'update_column_labels') {
-        if (!$pipeline['supports_import']) {
-            json_response(array('success' => false, 'error' => 'Renomear colunas não está disponível neste pipeline'), 400);
-        }
-
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             json_response(array('success' => false, 'error' => 'Método inválido'), 405);
         }

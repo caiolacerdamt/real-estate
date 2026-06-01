@@ -581,9 +581,7 @@
       const hasMore = columnLeads.length > visibleColumnLeads.length;
       const accent = statusAccent(status);
       const label = columnLabels[status] || status;
-      const labelMarkup = pipelineConfig().supportsImport
-        ? `<input data-column-label="${escapeHtml(status)}" value="${escapeHtml(label)}" class="column-label min-w-0 flex-1 truncate rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-sm font-bold ${accent.text} outline-none transition hover:border-white/10 focus:border-white/15 focus:bg-white/[0.04]">`
-        : `<h2 class="min-w-0 flex-1 truncate px-1 py-0.5 text-sm font-bold ${accent.text}">${escapeHtml(label)}</h2>`;
+      const labelMarkup = `<input data-column-label="${escapeHtml(status)}" value="${escapeHtml(label)}" class="column-label min-w-0 flex-1 truncate rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-sm font-bold ${accent.text} outline-none transition hover:border-white/10 focus:border-white/15 focus:bg-white/[0.04]">`;
 
       return `
         <section class="flex h-[calc(100vh-230px)] min-w-[350px] flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.07] bg-zinc-950/70 shadow-[0_18px_60px_rgba(0,0,0,.22)] backdrop-blur xl:min-w-0">
