@@ -32,6 +32,7 @@ function pipeline_configs() {
             'editable_fields' => array('Status', 'Observação', 'Internal_Notes'),
             'supports_import' => true,
             'supports_sync' => false,
+            'supports_delete' => false,
             'sync_url' => ''
         ),
         'lancamento_maio_2026' => array(
@@ -43,6 +44,7 @@ function pipeline_configs() {
             'editable_fields' => array('Status', 'Internal_Notes'),
             'supports_import' => false,
             'supports_sync' => true,
+            'supports_delete' => true,
             'sync_url' => 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ7iPToWrBRwQv3r0Sp_sJo31DGhYAc0Tidyt0q6dBg9rCe7GZO9wSfwPJnvFq4ocJuU4JcVGlGlRzS/pub?gid=0&single=true&output=csv'
         )
     );
@@ -351,7 +353,8 @@ try {
             'last_synced' => $data['last_synced'],
             'statuses' => $pipeline['statuses'],
             'supports_import' => $pipeline['supports_import'],
-            'supports_sync' => $pipeline['supports_sync']
+            'supports_sync' => $pipeline['supports_sync'],
+            'supports_delete' => $pipeline['supports_delete']
         ));
     }
 
@@ -409,6 +412,41 @@ try {
             json_response(array('success' => false, 'error' => 'Lead não encontrado'), 404);
         }
 
+        write_data($pipeline, $data);
+        json_response(array('success' => true));
+    }
+
+    if ($action === 'delete_lead') {
+        if (!$pipeline['supports_delete']) {
+            json_response(array('success' => false, 'error' => 'Excluir lead não está disponível neste pipeline'), 400);
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            json_response(array('success' => false, 'error' => 'Método inválido'), 405);
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($input) || empty($input['Lead_ID'])) {
+            json_response(array('success' => false, 'error' => 'Lead_ID obrigatório'), 400);
+        }
+
+        $data = read_data($pipeline);
+        $found = false;
+        $remainingLeads = array();
+
+        foreach ($data['leads'] as $lead) {
+            if (isset($lead['Lead_ID']) && $lead['Lead_ID'] === $input['Lead_ID']) {
+                $found = true;
+                continue;
+            }
+            $remainingLeads[] = $lead;
+        }
+
+        if (!$found) {
+            json_response(array('success' => false, 'error' => 'Lead não encontrado'), 404);
+        }
+
+        $data['leads'] = $remainingLeads;
         write_data($pipeline, $data);
         json_response(array('success' => true));
     }
