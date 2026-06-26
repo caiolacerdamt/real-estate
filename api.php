@@ -463,7 +463,7 @@ function all_pipeline_configs() {
             $configs[$key] = $config;
         }
     } catch (Throwable $e) {
-        // Neon indisponível: retorna só real_estate
+        $configs['_neon_error'] = $e->getMessage();
     }
     return $configs;
 }
