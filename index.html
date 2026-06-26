@@ -144,9 +144,11 @@
     }
 
     function leadField(lead, ...keys) {
+      const fieldMap = (pipelineConfig().display || {}).field_map || {};
       for (const key of keys) {
-        if (Object.prototype.hasOwnProperty.call(lead, key) && String(lead[key] || '').trim() !== '') {
-          return lead[key];
+        const actualKey = fieldMap[key] || key;
+        if (Object.prototype.hasOwnProperty.call(lead, actualKey) && String(lead[actualKey] || '').trim() !== '') {
+          return lead[actualKey];
         }
       }
       return '';
@@ -746,7 +748,9 @@
     }
 
     function launchResponseEntries(lead) {
-      const coreFields = new Set(['Lead_ID', 'Nome', 'Name', 'Email', 'Number', 'Padronized Number', 'Score AI', 'DateTime', 'Status', 'Internal_Notes']);
+      const fieldMap = (pipelineConfig().display || {}).field_map || {};
+      const mappedValues = new Set(Object.values(fieldMap));
+      const coreFields = new Set(['Lead_ID', 'Nome', 'Name', 'Email', 'Number', 'Padronized Number', 'Score AI', 'DateTime', 'Status', 'Internal_Notes', ...mappedValues]);
       return Object.keys(lead)
         .filter((key) => !coreFields.has(key) && !isUtmField(key) && String(lead[key] || '').trim() !== '')
         .map((key) => ({ key, value: lead[key] }));
@@ -1244,6 +1248,7 @@
       return {
         key: p.key,
         driver: p.driver,
+        display: p.display || {},
         title: p.name,
         heading: p.name,
         eyebrow: isNeon ? 'Google Sheets CSV' : 'Pipeline',
