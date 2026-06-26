@@ -482,14 +482,14 @@ function neon_sync_pipeline($pipeline) {
 
 // ── resolução de pipeline ─────────────────────────────────────────────────────
 
-function all_pipeline_configs() {
+function all_pipeline_configs(&$neonError = null) {
     $configs = array('real_estate' => file_pipeline_config());
     try {
         foreach (neon_list_pipelines() as $key => $config) {
             $configs[$key] = $config;
         }
     } catch (Throwable $e) {
-        // Neon indisponível: retorna só real_estate
+        $neonError = $e->getMessage();
     }
     return $configs;
 }
@@ -516,7 +516,8 @@ function current_pipeline() {
 try {
     // action=pipelines não precisa de pipeline específico
     if ($action === 'pipelines') {
-        $configs = all_pipeline_configs();
+        $neonError = null;
+        $configs = all_pipeline_configs($neonError);
         $output  = array();
         foreach ($configs as $config) {
             $entry = array(
@@ -533,7 +534,9 @@ try {
             if (!empty($config['display']))         $entry['display']        = $config['display'];
             $output[] = $entry;
         }
-        json_response(array('success' => true, 'pipelines' => $output));
+        $resp = array('success' => true, 'pipelines' => $output);
+        if ($neonError) $resp['neon_error'] = $neonError;
+        json_response($resp);
     }
 
     $pipeline = current_pipeline();
