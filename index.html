@@ -88,9 +88,10 @@
 
   <script>
     const API_URL = 'api.php';
-    const PIPELINES = {
+    let PIPELINES = {
       real_estate: {
         key: 'real_estate',
+        driver: 'file',
         title: 'Real Estate',
         heading: 'Real Estate CRM',
         eyebrow: 'Pipeline',
@@ -101,20 +102,6 @@
         supportsSync: false,
         supportsDelete: false,
         searchPlaceholder: 'Buscar por nome'
-      },
-      lancamento_maio_2026: {
-        key: 'lancamento_maio_2026',
-        title: 'Lançamento Maio 2026',
-        heading: 'Lançamento Maio 2026',
-        eyebrow: 'Google Sheets CSV',
-        subtitle: 'Pipeline conectado à planilha publicada, sincronizado por Lead_ID.',
-        badge: 'Sync automático',
-        statuses: ['Novo', 'Contatado', 'Respondeu', 'Qualificado', 'Call Marcada', 'Fechado', 'Descartado'],
-        boardStatuses: ['Novo', 'Contatado', 'Respondeu', 'Qualificado', 'Call Marcada'],
-        supportsImport: false,
-        supportsSync: true,
-        supportsDelete: true,
-        searchPlaceholder: 'Buscar por nome, email, telefone ou Lead_ID'
       }
     };
     const TIER_OPTIONS = ['All', 'A+', 'A', 'B', 'C', 'D'];
@@ -255,7 +242,7 @@
 
     function filteredLeads() {
       return leads.filter((lead) => {
-        if (currentPipeline === 'lancamento_maio_2026') {
+        if (pipelineConfig().driver === 'neon') {
           const searchText = [
             leadField(lead, 'Nome', 'Name'),
             leadField(lead, 'Email'),
@@ -514,7 +501,7 @@
     function renderFilterSection() {
       const config = pipelineConfig();
 
-      if (currentPipeline === 'lancamento_maio_2026') {
+      if (pipelineConfig().driver === 'neon') {
         return `
           <section class="border-b border-white/[0.06] px-4 py-4">
             <div class="mx-auto grid max-w-[1760px] gap-3 md:grid-cols-[minmax(260px,1fr)_auto]">
@@ -629,7 +616,7 @@
     }
 
     function renderLeadCard(lead, status) {
-      if (currentPipeline === 'lancamento_maio_2026') {
+      if (pipelineConfig().driver === 'neon') {
         return renderLaunchLeadCard(lead, status);
       }
       return renderRealEstateLeadCard(lead, status);
@@ -908,7 +895,7 @@
       const lead = getLead(leadId);
       if (!lead) return;
 
-      if (currentPipeline === 'lancamento_maio_2026') {
+      if (pipelineConfig().driver === 'neon') {
         renderLaunchModal(lead);
         return;
       }
@@ -1252,7 +1239,45 @@
       });
     }
 
-    loadLeads();
+    function buildPipelineEntry(p) {
+      const isNeon = p.driver === 'neon';
+      return {
+        key: p.key,
+        driver: p.driver,
+        title: p.name,
+        heading: p.name,
+        eyebrow: isNeon ? 'Google Sheets CSV' : 'Pipeline',
+        subtitle: isNeon
+          ? 'Pipeline conectado à planilha publicada, sincronizado por Lead_ID.'
+          : 'Pipeline principal com importação manual e status salvos em produção.',
+        badge: isNeon ? 'Sync automático' : 'CSV manual',
+        statuses: p.statuses || [],
+        boardStatuses: p.board_statuses || null,
+        supportsImport: !!p.supports_import,
+        supportsSync: !!p.supports_sync,
+        supportsDelete: !!p.supports_delete,
+        searchPlaceholder: isNeon
+          ? 'Buscar por nome, email, telefone ou Lead_ID'
+          : 'Buscar por nome'
+      };
+    }
+
+    async function initApp() {
+      try {
+        const response = await fetch(`${API_URL}?action=pipelines`);
+        const data = await response.json();
+        if (data.success && Array.isArray(data.pipelines)) {
+          const built = {};
+          data.pipelines.forEach((p) => { built[p.key] = buildPipelineEntry(p); });
+          PIPELINES = built;
+        }
+      } catch (_) {
+        // fallback: PIPELINES já tem real_estate
+      }
+      loadLeads();
+    }
+
+    initApp();
   </script>
 </body>
 </html>

@@ -1,2 +1,7 @@
 data.json
 .superpowers/
+.mcp.json
+pgcheck.php
+info.php
+probe.php
+config.php
