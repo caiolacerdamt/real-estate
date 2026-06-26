@@ -254,35 +254,68 @@ function import_real_estate($pipeline) {
     ));
 }
 
-// ── driver: Neon ──────────────────────────────────────────────────────────────
+// ── driver: Neon (HTTP SQL API — sem pdo_pgsql) ───────────────────────────────
 
-function neon_pdo() {
-    static $pdo = null;
-    if ($pdo === null) {
-        $dsn = defined('NEON_DATABASE_URL') ? NEON_DATABASE_URL : getenv('NEON_DATABASE_URL');
-        if (!$dsn) {
-            json_response(array('success' => false, 'error' => 'NEON_DATABASE_URL não configurada no servidor'), 500);
-        }
-        $pdo = new PDO($dsn, null, null, array(
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ));
-    }
-    return $pdo;
+function neon_http_config() {
+    static $cfg = null;
+    if ($cfg !== null) return $cfg;
+    $dsn = defined('NEON_DATABASE_URL') ? NEON_DATABASE_URL : getenv('NEON_DATABASE_URL');
+    if (!$dsn) throw new Exception('NEON_DATABASE_URL não configurada no servidor');
+    $p = parse_url($dsn);
+    // HTTP SQL API usa endpoint sem -pooler
+    $host = str_replace('-pooler.', '.', $p['host']);
+    $cfg = array(
+        'endpoint' => 'https://' . $host . '/sql',
+        'password' => urldecode($p['pass']),
+        'role'     => urldecode($p['user']),
+        'database' => ltrim($p['path'], '/'),
+    );
+    return $cfg;
+}
+
+function neon_http($body) {
+    $c = neon_http_config();
+    $ctx = stream_context_create(array('http' => array(
+        'method'        => 'POST',
+        'header'        =>
+            "Content-Type: application/json\r\n" .
+            "Authorization: Bearer " . $c['password'] . "\r\n" .
+            "Neon-Role-Name: " . $c['role'] . "\r\n" .
+            "Neon-Database-Name: " . $c['database'] . "\r\n",
+        'content'       => json_encode($body, JSON_UNESCAPED_UNICODE),
+        'timeout'       => 20,
+        'ignore_errors' => true,
+    )));
+    $raw = @file_get_contents($c['endpoint'], false, $ctx);
+    if ($raw === false) throw new Exception('Neon HTTP: sem resposta do servidor');
+    $data = json_decode($raw, true);
+    if (!is_array($data)) throw new Exception('Neon HTTP: resposta inválida');
+    if (isset($data['message'])) throw new Exception('Neon: ' . $data['message']);
+    return $data;
+}
+
+function neon_query($sql, $params = array()) {
+    return neon_http(array('query' => $sql, 'params' => array_values($params)));
+}
+
+function neon_transaction($queries) {
+    return neon_http(array('queries' => $queries));
 }
 
 function neon_row_to_pipeline($row) {
-    $columnLabels = json_decode($row['column_labels'], true);
+    // HTTP API retorna JSONB como array nativo; PDO retornaria string — aceita os dois
+    $d = function($v) { return is_string($v) ? json_decode($v, true) : $v; };
+    $cl = $d($row['column_labels']);
     return array(
         'key'             => $row['key'],
         'name'            => $row['name'],
         'driver'          => 'neon',
-        'statuses'        => json_decode($row['statuses'], true)        ?: array(),
-        'board_statuses'  => $row['board_statuses'] ? json_decode($row['board_statuses'], true) : null,
-        'editable_fields' => json_decode($row['editable_fields'], true) ?: array('Status', 'Internal_Notes'),
-        'column_labels'   => is_array($columnLabels) && !empty($columnLabels) ? $columnLabels : array(),
-        'sheet_urls'      => json_decode($row['sheet_urls'], true)      ?: array(),
-        'display'         => json_decode($row['display'], true)         ?: array(),
+        'statuses'        => $d($row['statuses'])        ?: array(),
+        'board_statuses'  => isset($row['board_statuses']) && $row['board_statuses'] !== null ? $d($row['board_statuses']) : null,
+        'editable_fields' => $d($row['editable_fields']) ?: array('Status', 'Internal_Notes'),
+        'column_labels'   => is_array($cl) && !empty($cl) ? $cl : array(),
+        'sheet_urls'      => $d($row['sheet_urls'])      ?: array(),
+        'display'         => $d($row['display'])         ?: array(),
         'supports_import' => false,
         'supports_sync'   => (bool)$row['supports_sync'],
         'supports_delete' => (bool)$row['supports_delete'],
@@ -290,22 +323,18 @@ function neon_row_to_pipeline($row) {
 }
 
 function neon_list_pipelines() {
-    $pdo  = neon_pdo();
-    $stmt = $pdo->query('SELECT * FROM pipelines ORDER BY created_at');
-    $out  = array();
-    foreach ($stmt->fetchAll() as $row) {
+    $result = neon_query('SELECT * FROM pipelines ORDER BY created_at');
+    $out = array();
+    foreach ($result['rows'] as $row) {
         $out[$row['key']] = neon_row_to_pipeline($row);
     }
     return $out;
 }
 
 function neon_get_pipeline($key) {
-    $pdo  = neon_pdo();
-    $stmt = $pdo->prepare('SELECT * FROM pipelines WHERE key = :key');
-    $stmt->execute(array(':key' => $key));
-    $row  = $stmt->fetch();
-    if (!$row) return null;
-    return neon_row_to_pipeline($row);
+    $result = neon_query('SELECT * FROM pipelines WHERE key = $1', array($key));
+    if (empty($result['rows'])) return null;
+    return neon_row_to_pipeline($result['rows'][0]);
 }
 
 function neon_flatten_lead($row) {
@@ -319,46 +348,49 @@ function neon_flatten_lead($row) {
 }
 
 function neon_read_leads($pipeline) {
-    $pdo  = neon_pdo();
-    $stmt = $pdo->prepare('SELECT lead_id, data, status, internal_notes FROM leads WHERE pipeline_key = :pk ORDER BY created_at');
-    $stmt->execute(array(':pk' => $pipeline['key']));
+    $result = neon_query(
+        'SELECT lead_id, data, status, internal_notes FROM leads WHERE pipeline_key = $1 ORDER BY created_at',
+        array($pipeline['key'])
+    );
     $leads = array();
-    foreach ($stmt->fetchAll() as $row) {
+    foreach ($result['rows'] as $row) {
         $leads[] = neon_flatten_lead($row);
     }
     return $leads;
 }
 
 function neon_update_lead($pipeline, $input) {
-    $pdo = neon_pdo();
-
-    $cur = $pdo->prepare('SELECT status, internal_notes FROM leads WHERE pipeline_key = :pk AND lead_id = :lid');
-    $cur->execute(array(':pk' => $pipeline['key'], ':lid' => $input['Lead_ID']));
-    $existing = $cur->fetch();
-    if (!$existing) {
+    $result = neon_query(
+        'SELECT status, internal_notes FROM leads WHERE pipeline_key = $1 AND lead_id = $2',
+        array($pipeline['key'], $input['Lead_ID'])
+    );
+    if (empty($result['rows'])) {
         json_response(array('success' => false, 'error' => 'Lead não encontrado'), 404);
     }
-
-    $newStatus = array_key_exists('Status', $input)         ? (string)$input['Status']         : $existing['status'];
-    $newNotes  = array_key_exists('Internal_Notes', $input) ? (string)$input['Internal_Notes']  : $existing['internal_notes'];
-
-    $stmt = $pdo->prepare('UPDATE leads SET status = :s, internal_notes = :n WHERE pipeline_key = :pk AND lead_id = :lid');
-    $stmt->execute(array(':s' => $newStatus, ':n' => $newNotes, ':pk' => $pipeline['key'], ':lid' => $input['Lead_ID']));
+    $existing  = $result['rows'][0];
+    $newStatus = array_key_exists('Status', $input)         ? (string)$input['Status']        : $existing['status'];
+    $newNotes  = array_key_exists('Internal_Notes', $input) ? (string)$input['Internal_Notes'] : $existing['internal_notes'];
+    neon_query(
+        'UPDATE leads SET status = $1, internal_notes = $2 WHERE pipeline_key = $3 AND lead_id = $4',
+        array($newStatus, $newNotes, $pipeline['key'], $input['Lead_ID'])
+    );
 }
 
 function neon_delete_lead($pipeline, $leadId) {
-    $pdo  = neon_pdo();
-    $stmt = $pdo->prepare('DELETE FROM leads WHERE pipeline_key = :pk AND lead_id = :lid');
-    $stmt->execute(array(':pk' => $pipeline['key'], ':lid' => $leadId));
-    if ($stmt->rowCount() === 0) {
+    $result = neon_query(
+        'DELETE FROM leads WHERE pipeline_key = $1 AND lead_id = $2',
+        array($pipeline['key'], $leadId)
+    );
+    if (($result['rowCount'] ?? 0) === 0) {
         json_response(array('success' => false, 'error' => 'Lead não encontrado'), 404);
     }
 }
 
 function neon_update_column_labels($pipeline, $labels) {
-    $pdo  = neon_pdo();
-    $stmt = $pdo->prepare('UPDATE pipelines SET column_labels = :labels WHERE key = :pk');
-    $stmt->execute(array(':labels' => json_encode($labels, JSON_UNESCAPED_UNICODE), ':pk' => $pipeline['key']));
+    neon_query(
+        'UPDATE pipelines SET column_labels = $1::jsonb WHERE key = $2',
+        array(json_encode($labels, JSON_UNESCAPED_UNICODE), $pipeline['key'])
+    );
     return $labels;
 }
 
@@ -400,40 +432,34 @@ function neon_sync_pipeline($pipeline) {
         fclose($handle);
     }
 
-    $pdo         = neon_pdo();
     $pipelineKey = $pipeline['key'];
 
-    $existingStmt = $pdo->prepare('SELECT lead_id FROM leads WHERE pipeline_key = :pk');
-    $existingStmt->execute(array(':pk' => $pipelineKey));
+    $existingResult = neon_query('SELECT lead_id FROM leads WHERE pipeline_key = $1', array($pipelineKey));
     $existingIds = array();
-    foreach ($existingStmt->fetchAll() as $row) {
+    foreach ($existingResult['rows'] as $row) {
         $existingIds[$row['lead_id']] = true;
     }
 
-    $upsert = $pdo->prepare(
-        "INSERT INTO leads (pipeline_key, lead_id, data, status, internal_notes)
-         VALUES (:pk, :lid, :data::jsonb, 'Novo', '')
-         ON CONFLICT (pipeline_key, lead_id)
-         DO UPDATE SET data = excluded.data"
-    );
-
+    $queries  = array();
     $imported = 0; $new = 0; $updated = 0;
 
-    $pdo->beginTransaction();
     foreach ($mergedByLeadId as $leadId => $mergedRow) {
         $data = $mergedRow;
         unset($data['Lead_ID']);
-
-        $upsert->execute(array(
-            ':pk'   => $pipelineKey,
-            ':lid'  => $leadId,
-            ':data' => json_encode($data, JSON_UNESCAPED_UNICODE),
-        ));
-
+        $queries[] = array(
+            'query'  => "INSERT INTO leads (pipeline_key, lead_id, data, status, internal_notes)
+                         VALUES (\$1, \$2, \$3::jsonb, 'Novo', '')
+                         ON CONFLICT (pipeline_key, lead_id)
+                         DO UPDATE SET data = excluded.data",
+            'params' => array($pipelineKey, $leadId, json_encode($data, JSON_UNESCAPED_UNICODE)),
+        );
         $imported++;
         if (isset($existingIds[$leadId])) { $updated++; } else { $new++; }
     }
-    $pdo->commit();
+
+    if (!empty($queries)) {
+        neon_transaction($queries);
+    }
 
     $leads        = neon_read_leads($pipeline);
     $columnLabels = !empty($pipeline['column_labels'])
@@ -456,14 +482,14 @@ function neon_sync_pipeline($pipeline) {
 
 // ── resolução de pipeline ─────────────────────────────────────────────────────
 
-function all_pipeline_configs(&$neonError = null) {
+function all_pipeline_configs() {
     $configs = array('real_estate' => file_pipeline_config());
     try {
         foreach (neon_list_pipelines() as $key => $config) {
             $configs[$key] = $config;
         }
     } catch (Throwable $e) {
-        $neonError = $e->getMessage();
+        // Neon indisponível: retorna só real_estate
     }
     return $configs;
 }
@@ -490,8 +516,7 @@ function current_pipeline() {
 try {
     // action=pipelines não precisa de pipeline específico
     if ($action === 'pipelines') {
-        $neonError = null;
-        $configs = all_pipeline_configs($neonError);
+        $configs = all_pipeline_configs();
         $output  = array();
         foreach ($configs as $config) {
             $entry = array(
@@ -508,9 +533,7 @@ try {
             if (!empty($config['display']))         $entry['display']        = $config['display'];
             $output[] = $entry;
         }
-        $resp = array('success' => true, 'pipelines' => $output);
-        if ($neonError) $resp['neon_error'] = $neonError;
-        json_response($resp);
+        json_response(array('success' => true, 'pipelines' => $output));
     }
 
     $pipeline = current_pipeline();
