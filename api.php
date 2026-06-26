@@ -264,11 +264,11 @@ function neon_http_config() {
     $p = parse_url($dsn);
     // HTTP SQL API usa endpoint sem -pooler
     $host = str_replace('-pooler.', '.', $p['host']);
+    // Neon-Connection-String header usa a connection string sem params de TLS
+    $conn = 'postgresql://' . $p['user'] . ':' . $p['pass'] . '@' . $host . $p['path'];
     $cfg = array(
-        'endpoint' => 'https://' . $host . '/sql',
-        'password' => urldecode($p['pass']),
-        'role'     => urldecode($p['user']),
-        'database' => ltrim($p['path'], '/'),
+        'endpoint'    => 'https://' . $host . '/sql',
+        'conn_string' => $conn,
     );
     return $cfg;
 }
@@ -279,9 +279,7 @@ function neon_http($body) {
         'method'        => 'POST',
         'header'        =>
             "Content-Type: application/json\r\n" .
-            "Authorization: Bearer " . $c['password'] . "\r\n" .
-            "Neon-Role-Name: " . $c['role'] . "\r\n" .
-            "Neon-Database-Name: " . $c['database'] . "\r\n",
+            "Neon-Connection-String: " . $c['conn_string'] . "\r\n",
         'content'       => json_encode($body, JSON_UNESCAPED_UNICODE),
         'timeout'       => 20,
         'ignore_errors' => true,
